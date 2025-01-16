@@ -23,12 +23,13 @@ app.get('/debug', async (req, res) => {
     });
 
     console.log(process.env.PRIVATE_KEY);
-    
+
     res.json({
       clientEmail: credentials.client_email,
       privateKeyExists: !!credentials.private_key,
       privateKeyStartsWith: credentials.private_key?.substring(0, 27),
-      privateKeyEndsWith: credentials.private_key?.substring(credentials.private_key.length - 25)
+      privateKeyEndsWith: credentials.private_key?.substring(credentials.private_key.length - 25),
+      keyLog:process.env.PRIVATE_KEY
     });
   } catch (error) {
     console.error('Debug endpoint error:', error);
