@@ -7,52 +7,55 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Add debug endpoint to check credentials format
-app.get('/debug', (req, res) => {
-  const credentials = {
-    client_email: process.env.CLIENT_EMAIL,
-    private_key: process.env.PRIVATE_KEY
-  };
-  
-  // Log the first and last few characters of the private key
-  const keyPreview = {
-    start: credentials.private_key.substring(0, 50),
-    end: credentials.private_key.substring(credentials.private_key.length - 50)
-  };
-  
-  res.json({
-    clientEmailExists: !!credentials.client_email,
-    privateKeyExists: !!credentials.private_key,
-    keyPreview: keyPreview
-  });
+app.get('/debug', async (req, res) => {
+  try {
+    const credentials = {
+      client_email: process.env.CLIENT_EMAIL,
+      private_key: process.env.PRIVATE_KEY
+    };
+    
+    console.log('Credentials loaded:', {
+      hasClientEmail: !!credentials.client_email,
+      hasPrivateKey: !!credentials.private_key,
+      privateKeyStart: credentials.private_key?.substring(0, 27),
+      privateKeyEnd: credentials.private_key?.substring(credentials.private_key.length - 25)
+    });
+
+    res.json({
+      clientEmail: credentials.client_email,
+      privateKeyExists: !!credentials.private_key,
+      privateKeyStartsWith: credentials.private_key?.substring(0, 27),
+      privateKeyEndsWith: credentials.private_key?.substring(credentials.private_key.length - 25)
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
-
-async function getAccessToken() {
-  const client = new JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-  });
-
-  const token = await client.getAccessToken();
-  return token.token;
-}
-
 app.get('/token', async (req, res) => {
-    try {
-      console.log('Client email:', credentials.client_email); // Log email
-      console.log('Private key exists:', !!credentials.private_key); // Check if key exists
-      const token = await getAccessToken();
-      res.json({ access_token: token });
-    } catch (error) {
-      console.error('Detailed error:', error); // More detailed error
-      res.status(500).json({ 
-        error: 'Failed to get access token',
-        details: error.message 
-      });
-    }
-  });
+  try {
+    const credentials = {
+      client_email: process.env.CLIENT_EMAIL,
+      private_key: process.env.PRIVATE_KEY
+    };
+
+    const client = new JWT({
+      email: credentials.client_email,
+      key: credentials.private_key,
+      scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+    });
+
+    const token = await client.getAccessToken();
+    res.json({ access_token: token.token });
+  } catch (error) {
+    console.error('Token error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get access token',
+      details: error.message 
+    });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
