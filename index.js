@@ -7,11 +7,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Your service account credentials from the JSON file
-const credentials = {
-  client_email: process.env.CLIENT_EMAIL,
-  private_key: process.env.PRIVATE_KEY
-};
+// Add debug endpoint to check credentials format
+app.get('/debug', (req, res) => {
+  const credentials = {
+    client_email: process.env.CLIENT_EMAIL,
+    private_key: process.env.PRIVATE_KEY
+  };
+  
+  // Log the first and last few characters of the private key
+  const keyPreview = {
+    start: credentials.private_key.substring(0, 50),
+    end: credentials.private_key.substring(credentials.private_key.length - 50)
+  };
+  
+  res.json({
+    clientEmailExists: !!credentials.client_email,
+    privateKeyExists: !!credentials.private_key,
+    keyPreview: keyPreview
+  });
+});
+
 
 async function getAccessToken() {
   const client = new JWT({
