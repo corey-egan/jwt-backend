@@ -25,14 +25,19 @@ async function getAccessToken() {
 }
 
 app.get('/token', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    res.json({ access_token: token });
-  } catch (error) {
-    console.error('Error getting token:', error);
-    res.status(500).json({ error: 'Failed to get access token' });
-  }
-});
+    try {
+      console.log('Client email:', credentials.client_email); // Log email
+      console.log('Private key exists:', !!credentials.private_key); // Check if key exists
+      const token = await getAccessToken();
+      res.json({ access_token: token });
+    } catch (error) {
+      console.error('Detailed error:', error); // More detailed error
+      res.status(500).json({ 
+        error: 'Failed to get access token',
+        details: error.message 
+      });
+    }
+  });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
