@@ -19,8 +19,11 @@ app.get('/debug', async (req, res) => {
       hasPrivateKey: !!credentials.private_key,
       privateKeyStart: credentials.private_key?.substring(0, 27),
       privateKeyEnd: credentials.private_key?.substring(credentials.private_key.length - 25)
+      
     });
 
+    console.log(process.env.PRIVATE_KEY);
+    
     res.json({
       clientEmail: credentials.client_email,
       privateKeyExists: !!credentials.private_key,
