@@ -57,56 +57,92 @@ async function getAuthToken() {
 app.get('/emails', async (req, res) => {
     try {
         console.log('Starting email fetch...');
-        
-        const client = new JWT({
-            email: process.env.CLIENT_EMAIL,
-            key: cleanPrivateKey(process.env.PRIVATE_KEY),
-            subject: 'corey.egan4@mailportio.com',
-            scopes: ['https://www.googleapis.com/auth/gmail.readonly']
-        });
+        const pageSize = parseInt(req.query.pageSize) || 5;
+        const pageToken = req.query.pageToken || null;
 
+        // Get auth token (using cached if available)
         console.log('Getting auth token...');
-        const token = await client.getAccessToken();
-        console.log('Token received:', !!token);
+        const token = await getAuthToken();
+        console.log('Token received');
 
+        // Fetch email list
         console.log('Making Gmail API request...');
         const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/corey.egan4@mailportio.com/messages');
-        listUrl.searchParams.append('maxResults', 5); // Start with just 5 messages
+        listUrl.searchParams.append('maxResults', pageSize);
+        if (pageToken) {
+            listUrl.searchParams.append('pageToken', pageToken);
+        }
 
         const listResponse = await fetch(listUrl.toString(), {
             headers: {
-                'Authorization': `Bearer ${token.token}`,
+                'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
             },
-            timeout: 10000 // Increased timeout
+            timeout: 5000
         });
 
-        console.log('Response received, status:', listResponse.status);
-        
-        if (!listResponse.ok) {
-            const errorData = await listResponse.json();
-            console.error('Gmail API Error:', errorData);
-            throw new Error(`Gmail API error: ${JSON.stringify(errorData)}`);
+        console.log('List response received, status:', listResponse.status);
+        const { messages, nextPageToken } = await listResponse.json();
+
+        if (!messages) {
+            console.log('No messages found');
+            return res.json({ emails: [], nextPageToken: null });
         }
 
-        const data = await listResponse.json();
-        console.log('Data received, message count:', data.messages?.length);
+        console.log(`Found ${messages.length} messages, fetching details...`);
 
-        // For now, just return the IDs without fetching details
+        // Fetch details in parallel with timeout and caching
+        const emailDetails = await Promise.all(
+            messages.map(async ({ id }) => {
+                const cacheKey = `email_${id}`;
+                const cachedEmail = cache.get(cacheKey);
+                if (cachedEmail) {
+                    console.log(`Using cached data for email ${id}`);
+                    return cachedEmail;
+                }
+
+                try {
+                    const detailResponse = await fetch(
+                        `https://gmail.googleapis.com/gmail/v1/users/corey.egan4@mailportio.com/messages/${id}?format=full`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            },
+                            timeout: 5000
+                        }
+                    );
+
+                    const emailData = await detailResponse.json();
+                    const processedEmail = {
+                        id: emailData.id,
+                        threadId: emailData.threadId,
+                        subject: emailData.payload.headers.find(h => h.name === 'Subject')?.value || '',
+                        from: emailData.payload.headers.find(h => h.name === 'From')?.value || '',
+                        date: emailData.payload.headers.find(h => h.name === 'Date')?.value || '',
+                        contentType: emailData.payload.mimeType,
+                        ...parseEmailContent(emailData.payload)
+                    };
+
+                    cache.set(cacheKey, processedEmail, 3600);
+                    return processedEmail;
+                } catch (error) {
+                    console.error(`Error fetching email ${id}:`, error);
+                    return null;
+                }
+            })
+        );
+
+        console.log('All email details fetched');
         res.json({
-            emails: data.messages || [],
-            nextPageToken: data.nextPageToken
+            emails: emailDetails.filter(Boolean),
+            nextPageToken
         });
 
     } catch (error) {
-        console.error('Detailed error:', {
-            message: error.message,
-            stack: error.stack
-        });
+        console.error('Email fetch error:', error);
         res.status(500).json({ 
             error: 'Failed to fetch emails',
-            details: error.message,
-            stack: error.stack
+            details: error.message 
         });
     }
 });
