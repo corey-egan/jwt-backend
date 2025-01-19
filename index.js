@@ -1,6 +1,7 @@
 const express = require('express');
 const { JWT } = require('google-auth-library');
 const cors = require('cors');
+const fetch = require('node-fetch');  // Add this line
 
 const app = express();
 app.use(cors());
@@ -55,4 +56,37 @@ app.get('/token', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+});
+
+// Add this to your existing index.js
+app.get('/emails', async (req, res) => {
+    try {
+        const client = new JWT({
+            email: process.env.CLIENT_EMAIL,
+            key: cleanPrivateKey(process.env.PRIVATE_KEY),
+            scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+        });
+
+        // Get authentication token
+        const token = await client.getAccessToken();
+        
+        // Make Gmail API request
+        const response = await fetch(
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10',
+            {
+                headers: {
+                    'Authorization': `Bearer ${token.token}`
+                }
+            }
+        );
+
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Email fetch error:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch emails',
+            details: error.message 
+        });
+    }
 });
