@@ -104,6 +104,32 @@ app.get('/emails', async (req, res) => {
             return '';
         }
 
+        function parseEmailContent(payload) {
+            function findContent(part) {
+                if (part.mimeType === 'text/html') {
+                    return {
+                        type: 'html',
+                        content: Buffer.from(part.body.data, 'base64').toString()
+                    };
+                }
+                if (part.mimeType === 'text/plain') {
+                    return {
+                        type: 'plain',
+                        content: Buffer.from(part.body.data, 'base64').toString()
+                    };
+                }
+                if (part.parts) {
+                    return part.parts.map(findContent).filter(Boolean)[0];
+                }
+                return null;
+            }
+            
+            return findContent(payload) || {
+                type: 'unknown',
+                content: ''
+            };
+        }
+
         // Get full details for each message
         const emailDetails = await Promise.all(
             messages.map(async ({ id }) => {
@@ -123,12 +149,11 @@ app.get('/emails', async (req, res) => {
             emails: emailDetails.map(email => ({
                 id: email.id,
                 threadId: email.threadId,
-                subject: email.payload.headers.find(h => h.name === 'Subject')?.value,
-                from: email.payload.headers.find(h => h.name === 'From')?.value,
-                date: email.payload.headers.find(h => h.name === 'Date')?.value,
-                snippet: email.snippet,
-                body: decodeBody(email.payload),
-                raw_payload: email.payload  // Including raw payload for debugging
+                subject: email.payload.headers.find(h => h.name === 'Subject')?.value || '',
+                from: email.payload.headers.find(h => h.name === 'From')?.value || '',
+                date: email.payload.headers.find(h => h.name === 'Date')?.value || '',
+                contentType: email.payload.mimeType,
+                ...parseEmailContent(email.payload)
             }))
         });
     } catch (error) {
