@@ -145,48 +145,57 @@ app.post('/create-alias', async (req, res) => {
     try {
         const { competitorName } = req.body;
         
-        // Sanitize competitor name for email
-        const sanitizedName = competitorName
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '')
-            .substring(0, 20);
-            
-        const aliasEmail = `tracking+${sanitizedName}@mailportio.com`;
+        const client = new JWT({
+            email: process.env.CLIENT_EMAIL,
+            key: cleanPrivateKey(process.env.PRIVATE_KEY),
+            subject: 'corey.egan4@mailportio.com',
+            scopes: [
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/admin.directory.user',
+                'https://www.googleapis.com/auth/admin.directory.group',
+                'https://www.googleapis.com/auth/gmail.settings.sharing',
+                'https://www.googleapis.com/auth/gmail.settings.sharing'
+            ]
+        });
+
+        console.log('Getting token with scopes:', client.scopes);
+        const token = await client.getAccessToken();
         
-        const token = await getAuthToken();
-        
-        // Admin SDK API call to create alias
+        // Log the request we're about to make
+        console.log('Making request to create alias with token');
+
         const response = await fetch(
             `https://admin.googleapis.com/admin/directory/v1/users/corey.egan4@mailportio.com/aliases`,
             {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${token.token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    alias: aliasEmail
+                    alias: `tracking+${competitorName.toLowerCase()}@mailportio.com`
                 })
             }
         );
 
+        const data = await response.json();
+        console.log('API Response:', data);
+
         if (!response.ok) {
-            const errorData = await response.json();
-            console.error('API Error:', errorData);
-            throw new Error(errorData.error?.message || 'Failed to create alias');
+            throw new Error(data.error?.message || 'Failed to create alias');
         }
 
-        const data = await response.json();
         res.json({ 
             success: true, 
-            alias: aliasEmail,
+            alias: `tracking+${competitorName.toLowerCase()}@mailportio.com`,
             details: data
         });
     } catch (error) {
-        console.error('Alias creation error:', error);
+        console.error('Full error:', error);
         res.status(500).json({ 
             error: 'Failed to create alias',
-            details: error.message 
+            details: error.message,
+            scopes: client?.scopes // Add scopes to error response
         });
     }
 });
