@@ -140,3 +140,53 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+app.post('/create-alias', async (req, res) => {
+    try {
+        const { competitorName } = req.body;
+        
+        // Sanitize competitor name for email
+        const sanitizedName = competitorName
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '')
+            .substring(0, 20);
+            
+        const aliasEmail = `tracking+${sanitizedName}@mailportio.com`;
+        
+        const token = await getAuthToken();
+        
+        // Admin SDK API call to create alias
+        const response = await fetch(
+            `https://admin.googleapis.com/admin/directory/v1/users/corey.egan4@mailportio.com/aliases`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    alias: aliasEmail
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('API Error:', errorData);
+            throw new Error(errorData.error?.message || 'Failed to create alias');
+        }
+
+        const data = await response.json();
+        res.json({ 
+            success: true, 
+            alias: aliasEmail,
+            details: data
+        });
+    } catch (error) {
+        console.error('Alias creation error:', error);
+        res.status(500).json({ 
+            error: 'Failed to create alias',
+            details: error.message 
+        });
+    }
+});
