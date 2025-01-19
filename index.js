@@ -6,20 +6,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// More detailed debug endpoint
+// Function to clean private key
+function cleanPrivateKey(key) {
+    return key
+        .replace(/\\n/g, '\n')  // Replace double escaped newlines with single
+        .replace(/"/g, '');     // Remove any quotes
+}
+
 app.get('/debug', async (req, res) => {
     try {
-        const privateKey = process.env.PRIVATE_KEY;
+        const rawKey = process.env.PRIVATE_KEY;
+        const cleanedKey = cleanPrivateKey(rawKey);
         res.json({
             clientEmail: process.env.CLIENT_EMAIL,
-            privateKeyExists: !!privateKey,
-            privateKeyLength: privateKey?.length,
-            privateKeyFormat: {
-                hasBeginMarker: privateKey?.includes('-----BEGIN PRIVATE KEY-----'),
-                hasEndMarker: privateKey?.includes('-----END PRIVATE KEY-----'),
-                containsNewlines: privateKey?.includes('\\n'),
-                firstChars: privateKey?.substring(0, 40),
-                lastChars: privateKey?.substring(privateKey.length - 40)
+            rawKeyLength: rawKey?.length,
+            cleanedKeyLength: cleanedKey?.length,
+            cleanedKeyFormat: {
+                hasBeginMarker: cleanedKey?.includes('-----BEGIN PRIVATE KEY-----'),
+                hasEndMarker: cleanedKey?.includes('-----END PRIVATE KEY-----'),
+                firstChars: cleanedKey?.substring(0, 40),
+                lastChars: cleanedKey?.substring(cleanedKey.length - 40)
             }
         });
     } catch (error) {
@@ -27,13 +33,11 @@ app.get('/debug', async (req, res) => {
     }
 });
 
-// Rest of your code...
-
 app.get('/token', async (req, res) => {
     try {
         const client = new JWT({
             email: process.env.CLIENT_EMAIL,
-            key: process.env.PRIVATE_KEY,
+            key: cleanPrivateKey(process.env.PRIVATE_KEY),
             scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
         });
 
