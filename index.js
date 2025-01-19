@@ -61,47 +61,81 @@ app.listen(PORT, () => {
 // Add this to your existing index.js
 app.get('/emails', async (req, res) => {
     try {
-        console.log('Creating JWT client...');
         const client = new JWT({
             email: process.env.CLIENT_EMAIL,
             key: cleanPrivateKey(process.env.PRIVATE_KEY),
-            scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-            subject: 'corey.egan4@mailportio.com'
+            subject: 'corey.egan4@mailportio.com',
+            scopes: ['https://www.googleapis.com/auth/gmail.readonly']
         });
 
-        console.log('Getting access token...');
         const token = await client.getAccessToken();
-        console.log('Token received:', !!token);
-
-        console.log('Making Gmail API request...');
-        const response = await fetch(
+        
+        // First get list of messages
+        const listResponse = await fetch(
             'https://gmail.googleapis.com/gmail/v1/users/corey.egan4@mailportio.com/messages?maxResults=10',
             {
                 headers: {
-                    'Authorization': `Bearer ${token.token}`,
-                    'Accept': 'application/json'
+                    'Authorization': `Bearer ${token.token}`
                 }
             }
         );
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Gmail API Error:', errorData);
-            throw new Error(`Gmail API error: ${JSON.stringify(errorData)}`);
+        const { messages } = await listResponse.json();
+
+        // Helper function to decode email body
+        function decodeBody(payload) {
+            if (payload.body.data) {
+                return Buffer.from(payload.body.data, 'base64').toString();
+            }
+            
+            // If the message is multipart, recursively get all parts
+            if (payload.parts) {
+                return payload.parts.map(part => {
+                    if (part.body.data) {
+                        return Buffer.from(part.body.data, 'base64').toString();
+                    }
+                    if (part.parts) {
+                        return decodeBody(part);
+                    }
+                    return '';
+                }).join('\n');
+            }
+            
+            return '';
         }
 
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Detailed error:', {
-            message: error.message,
-            stack: error.stack,
-            response: error.response?.data
+        // Get full details for each message
+        const emailDetails = await Promise.all(
+            messages.map(async ({ id }) => {
+                const detailResponse = await fetch(
+                    `https://gmail.googleapis.com/gmail/v1/users/corey.egan4@mailportio.com/messages/${id}?format=full`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token.token}`
+                        }
+                    }
+                );
+                return detailResponse.json();
+            })
+        );
+
+        res.json({
+            emails: emailDetails.map(email => ({
+                id: email.id,
+                threadId: email.threadId,
+                subject: email.payload.headers.find(h => h.name === 'Subject')?.value,
+                from: email.payload.headers.find(h => h.name === 'From')?.value,
+                date: email.payload.headers.find(h => h.name === 'Date')?.value,
+                snippet: email.snippet,
+                body: decodeBody(email.payload),
+                raw_payload: email.payload  // Including raw payload for debugging
+            }))
         });
+    } catch (error) {
+        console.error('Email fetch error:', error);
         res.status(500).json({ 
             error: 'Failed to fetch emails',
-            details: error.message,
-            stack: error.stack
+            details: error.message 
         });
     }
 });
