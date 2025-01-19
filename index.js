@@ -65,14 +65,15 @@ app.get('/emails', async (req, res) => {
             email: process.env.CLIENT_EMAIL,
             key: cleanPrivateKey(process.env.PRIVATE_KEY),
             scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+            subject: 'corey.egan4@mailportio.com' // Add this line - use your workspace email
         });
 
         // Get authentication token
         const token = await client.getAccessToken();
         
-        // Make Gmail API request
+        // Make Gmail API request - specify user email in the URL
         const response = await fetch(
-            'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10',
+            'https://gmail.googleapis.com/gmail/v1/users/corey.egan4@mailportio.com/messages?maxResults=10',
             {
                 headers: {
                     'Authorization': `Bearer ${token.token}`
