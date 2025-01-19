@@ -1,7 +1,7 @@
 const express = require('express');
 const { JWT } = require('google-auth-library');
 const cors = require('cors');
-const fetch = require('node-fetch');  // Add this line
+const { fetch } = require('cross-fetch');
 
 const app = express();
 app.use(cors());
