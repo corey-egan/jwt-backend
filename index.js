@@ -61,33 +61,47 @@ app.listen(PORT, () => {
 // Add this to your existing index.js
 app.get('/emails', async (req, res) => {
     try {
+        console.log('Creating JWT client...');
         const client = new JWT({
             email: process.env.CLIENT_EMAIL,
             key: cleanPrivateKey(process.env.PRIVATE_KEY),
             scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-            subject: 'corey.egan4@mailportio.com' // Add this line - use your workspace email
+            subject: 'corey.egan4@mailportio.com'
         });
 
-        // Get authentication token
+        console.log('Getting access token...');
         const token = await client.getAccessToken();
-        
-        // Make Gmail API request - specify user email in the URL
+        console.log('Token received:', !!token);
+
+        console.log('Making Gmail API request...');
         const response = await fetch(
             'https://gmail.googleapis.com/gmail/v1/users/corey.egan4@mailportio.com/messages?maxResults=10',
             {
                 headers: {
-                    'Authorization': `Bearer ${token.token}`
+                    'Authorization': `Bearer ${token.token}`,
+                    'Accept': 'application/json'
                 }
             }
         );
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Gmail API Error:', errorData);
+            throw new Error(`Gmail API error: ${JSON.stringify(errorData)}`);
+        }
+
         const data = await response.json();
         res.json(data);
     } catch (error) {
-        console.error('Email fetch error:', error);
+        console.error('Detailed error:', {
+            message: error.message,
+            stack: error.stack,
+            response: error.response?.data
+        });
         res.status(500).json({ 
             error: 'Failed to fetch emails',
-            details: error.message 
+            details: error.message,
+            stack: error.stack
         });
     }
 });
