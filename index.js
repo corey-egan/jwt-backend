@@ -126,6 +126,7 @@ app.get('/emails', async (req, res) => {
                         id: emailData.id,
                         threadId: emailData.threadId,
                         subject: emailData.payload.headers.find(h => h.name === 'Subject')?.value || '',
+                        to: emailData.payload.headers.find(h => h.name === 'To')?.value || '',
                         from: emailData.payload.headers.find(h => h.name === 'From')?.value || '',
                         date: emailData.payload.headers.find(h => h.name === 'Date')?.value || '',
                         contentType: emailData.payload.mimeType,
