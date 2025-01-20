@@ -20,22 +20,30 @@ function cleanPrivateKey(key) {
 
 // Helper function to parse email content
 function parseEmailContent(payload) {
+    let htmlContent = null;
+    let plainContent = null;
+
     function findContent(part) {
-        if (!part) return null;
-        if (part.body?.data) {
-            return {
-                type: part.mimeType,
-                content: Buffer.from(part.body.data, 'base64').toString()
-            };
+        if (!part) return;
+        
+        if (part.mimeType === 'text/html' && part.body?.data) {
+            htmlContent = Buffer.from(part.body.data, 'base64').toString();
+        }
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+            plainContent = Buffer.from(part.body.data, 'base64').toString();
         }
         if (part.parts) {
-            return part.parts.map(findContent).filter(Boolean)[0];
+            part.parts.forEach(findContent);
         }
-        return null;
     }
-    
-    return findContent(payload) || { type: 'unknown', content: '' };
+
+    findContent(payload);
+    return {
+        htmlContent,
+        plainContent
+    };
 }
+
 
 // Get auth token with caching
 async function getAuthToken() {
@@ -113,6 +121,7 @@ app.get('/emails', async (req, res) => {
                     );
 
                     const emailData = await detailResponse.json();
+                    const content = parseEmailContent(emailData.payload);
                     const processedEmail = {
                         id: emailData.id,
                         threadId: emailData.threadId,
@@ -120,7 +129,8 @@ app.get('/emails', async (req, res) => {
                         from: emailData.payload.headers.find(h => h.name === 'From')?.value || '',
                         date: emailData.payload.headers.find(h => h.name === 'Date')?.value || '',
                         contentType: emailData.payload.mimeType,
-                        ...parseEmailContent(emailData.payload)
+                        htmlContent: content.htmlContent,
+                        plainContent: content.plainContent
                     };
 
                     cache.set(cacheKey, processedEmail, 3600);
