@@ -177,7 +177,8 @@ app.post('/create-alias', async (req, res) => {
         
         res.json({ 
             success: true, 
-            alias: aliasEmail
+            alias: aliasEmail,
+            competitorName: competitorName
         });
     } catch (error) {
         console.error('Alias creation error:', error);
