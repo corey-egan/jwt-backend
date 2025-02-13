@@ -165,10 +165,10 @@ app.listen(PORT, () => {
 
 app.post('/create-alias', async (req, res) => {
     try {
-        const { competitorName } = req.body;
+        const { flowName } = req.body;
         
         // Sanitize competitor name for email
-        const sanitizedName = competitorName
+        const sanitizedName = flowName
             .toLowerCase()
             .replace(/[^a-z0-9]/g, '')
             .substring(0, 20);
@@ -178,7 +178,7 @@ app.post('/create-alias', async (req, res) => {
         res.json({ 
             success: true, 
             alias: aliasEmail,
-            competitorName: competitorName
+            flowName: flowName
         });
     } catch (error) {
         console.error('Alias creation error:', error);
